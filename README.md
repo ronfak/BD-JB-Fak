@@ -1,7 +1,14 @@
 # BD-JB-1250
 BD-JB for up to PS4 12.50
 
-This might be the exploit that was reported by TheFlow and patched at 12.52
+~~This might be the exploit that was reported by TheFlow and patched at 12.52~~
+
+Nope TheFlow just confirmed this is not his exploit.
+
+lmao
+
+Just take my early Christmas gift :)
+
 
 No this won't work at PS5.
 
@@ -21,5 +28,6 @@ https://github.com/john-tornblom/bdj-sdk/
 [hammer-83](https://github.com/hammer-83) - for his PS5 Remote JAR Loader, it helped me a lot to learn how BD-J works
 
 [john-tornblom](https://github.com/john-tornblom) - for his BDJ-SDK, I couldn't have compiled PS4 BD-J without his BDJ-SDK
+
 
 

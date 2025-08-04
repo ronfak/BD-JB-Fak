@@ -21,6 +21,7 @@ For compiling I recommend using john-tornblom's bdj-sdk
 
 https://github.com/john-tornblom/bdj-sdk/
 
+Don't forget to replace bdjo file in BDMV
 
 # Credits
 [TheFlow](https://github.com/theofficialflow) - for his BD-JB documentation and sources for native code execution
@@ -28,6 +29,7 @@ https://github.com/john-tornblom/bdj-sdk/
 [hammer-83](https://github.com/hammer-83) - for his PS5 Remote JAR Loader, it helped me a lot to learn how BD-J works
 
 [john-tornblom](https://github.com/john-tornblom) - for his BDJ-SDK, I couldn't have compiled PS4 BD-J without his BDJ-SDK
+
 
 
 

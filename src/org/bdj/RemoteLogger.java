@@ -1,214 +1,240 @@
 package org.bdj;
 
-import java.io.PrintWriter;
-import java.io.StringWriter;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.net.InetAddress;
-import java.util.StringTokenizer;
+import java.io.*;
+import java.net.*;
+import java.util.Vector;
 
-/**
- * Log over UDP, big thanks to psxdev.
- */
+
 public class RemoteLogger {
-    /** Remote port where the log messages are sent. */
-    protected int loggerPort;
-    /** Remote IP address or hostname where the log messages are sent. */
-    protected String loggerServer;
-    /** UDP socket created for message sending. */
-    protected DatagramSocket loggerSocket;
+    private int port;
+    private int maxCached;
+    private DatagramSocket socket;
+    private boolean running = false;
+    private Vector logCache = new Vector();
+    private Vector clients = new Vector();
+    
+    private static final int HEARTBEAT_INTERVAL = 1000;
+    private static final int HEARTBEAT_TIMEOUT = 3000;
+    private Thread heartbeatThread;
 
-    /**
-     * Constructor for RemoteLogger.
-     *
-     * @param server Hostname or IP of the remote machine receiving the logs.
-     * @param port Port on which the remote machine receives the logs.
-     * @param timeout Socket timeout for the remote logger (in milliseconds).
-     */
-    public RemoteLogger(String server, int port, int timeout) {
-        if (server != null && server.length() > 0 && port > 0) {
+    public RemoteLogger(int port, int maxCached) {
+        this.port = port;
+        this.maxCached = maxCached;
+    }
+
+    public synchronized void start() {
+        if (running) return;
+        
+        try {
+            socket = new DatagramSocket(port);
+            running = true;
+            
+            Thread listener = new Thread(new Runnable() {
+                public void run() {
+                    listenForClients();
+                }
+            });
+            listener.setDaemon(true);
+            listener.start();
+            
+            heartbeatThread = new Thread(new Runnable() {
+                public void run() {
+                    runHeartbeat();
+                }
+            });
+            heartbeatThread.setDaemon(true);
+            heartbeatThread.start();
+            
+        } catch (Exception e) {
+
+        }
+    }
+
+    public synchronized void stop() {
+        running = false;
+        if (socket != null) {
+            socket.close();
+        }
+        clients.clear();
+    }
+
+    private void listenForClients() {
+        byte[] buffer = new byte[1024];
+        
+        while (running) {
             try {
-                loggerSocket = new DatagramSocket();
-                loggerSocket.setSoTimeout(timeout);
-                loggerPort = port;
-                loggerServer = server;
+                DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
+                socket.receive(packet);
+                
+                String message = new String(packet.getData(), 0, packet.getLength(), "UTF-8").trim();
+                
+                if ("REGISTER".equals(message)) {
+                    ClientEndpoint client = new ClientEndpoint(packet.getAddress(), packet.getPort());
 
-            } catch (Throwable e) {
-
-            }
-        }
-    }
-
-    /**
-     * Terminates the remote logger by closing the socket.
-     */
-    public synchronized void close() {
-        if (loggerSocket != null) {
-            loggerSocket.close();
-            loggerSocket = null;
-        }
-    }
-
-    /**
-     * Sends the binary data over the logging socket.
-     *
-     * @param buffer Buffer to send.
-     * @param len Number of bytes in the buffer to send (typically, {@code buffer.length}).
-     */
-    public void sendBytes(byte[] buffer, int len) {
-        Throwable ex = null;
-
-        synchronized (this) {
-            if (loggerSocket != null) {
-                try {
-                    // Send in small chunks otherwise there may be an exception that packet is too large.
-                    // This is a UDP protocol constraint
-                    int i = 0;
-                    while (i < len) {
-                        int curLen = Math.min(len - i, 1024);
-                        DatagramPacket sendPacket = new DatagramPacket(buffer, i, curLen, InetAddress.getByName(loggerServer), loggerPort);
-                        loggerSocket.send(sendPacket);
-                        i += curLen;
+					synchronized (clients) {
+						if (!clients.contains(client)) {
+							clients.add(client);
+							sendToClient(client, "CONNECTED from " + client.address.getHostAddress() + "\n");
+							sendCachedMessages(client);
+						} else {
+							int index = clients.indexOf(client);
+							if (index >= 0) {
+								ClientEndpoint existingClient = (ClientEndpoint) clients.get(index);
+								existingClient.updateLastSeen();
+							}
+							sendToClient(client, "ALREADY_CONNECTED from " + client.address.getHostAddress() + "\n");
+						}
+					}
+                } else if ("HEARTBEAT_ACK".equals(message)) {
+                    ClientEndpoint client = new ClientEndpoint(packet.getAddress(), packet.getPort());
+                    synchronized (clients) {
+                        int index = clients.indexOf(client);
+                        if (index >= 0) {
+                            ClientEndpoint existingClient = (ClientEndpoint) clients.get(index);
+                            existingClient.updateLastSeen();
+                        }
                     }
-                } catch (Throwable e) {
-                    // Do not attempt network logging after failure (assume host down)
-                    close();
-
-                    ex = e;
+                }
+                
+            } catch (Exception e) {
+                if (running) {
+					
                 }
             }
         }
-
-        if (ex != null) {
-
-        }
     }
 
-    /**
-     * Sends a string over the logging socket. The string is sent in UTF-8 encoding.
-     *
-     * @param message String to send.
-     */
-    private void sendString(String message) {
-        Throwable ex = null;
-
-        synchronized (this) {
-            if (loggerSocket != null) {
-                try {
-                    byte[] buf = message.getBytes("UTF-8");
-                    sendBytes(buf, buf.length);
-                } catch (Throwable e) {
-                    ex = e;
+    private void runHeartbeat() {
+        while (running) {
+            try {
+                Thread.sleep(HEARTBEAT_INTERVAL);
+                
+                if (!running) break;
+                
+                synchronized (clients) {
+                    long currentTime = System.currentTimeMillis();
+                    
+                    for (int i = clients.size() - 1; i >= 0; i--) {
+                        ClientEndpoint client = (ClientEndpoint) clients.get(i);
+                        
+                        // Check if client is still alive
+                        if (currentTime - client.lastSeen > HEARTBEAT_TIMEOUT) {
+                            // Client is dead, remove it
+                            clients.remove(i);
+                            continue;
+                        }
+                        
+                        sendToClient(client, "HEARTBEAT");
+                    }
+                }
+                
+            } catch (InterruptedException e) {
+                break;
+            } catch (Exception e) {
+                if (running) {
+                    
                 }
             }
         }
+    }
 
-        if (ex != null) {
-
+    private void sendCachedMessages(ClientEndpoint client) {
+        synchronized (logCache) {
+            for (int i = 0; i < logCache.size(); i++) {
+                String cachedMsg = (String) logCache.get(i);
+                sendToClient(client, cachedMsg);
+            }
         }
     }
 
-    /**
-     * Sends an error message as well as the stack trace of an exception over the logging socket.
-     *
-     * @param msg Message to send.
-     * @param e Exception whose stack trace to send. If {@code null}, stack trace will not be generated.
-     */
-    public void error(String msg, Throwable e) {
-        StringBuffer sb = new StringBuffer();
-        sb.append("[ERROR] ");
-        sb.append(msg);
+	private void sendToClient(ClientEndpoint client, String message) {
+		try {
+			byte[] data = message.getBytes("UTF-8");
+			
+			// Send in small chunks to avoid "packet too large" exceptions
+			// This is a UDP protocol constraint
+			int i = 0;
+			while (i < data.length) {
+				int chunkSize = Math.min(data.length - i, 1024);
+				DatagramPacket packet = new DatagramPacket(data, i, chunkSize, client.address, client.port);
+				socket.send(packet);
+				i += chunkSize;
+			}
+			
+			// Send end-of-message marker to indicate complete message
+			if (data.length > 1024) {
+				String eom = "<<EOM>>";
+				byte[] eomData = eom.getBytes("UTF-8");
+				DatagramPacket eomPacket = new DatagramPacket(eomData, eomData.length, client.address, client.port);
+				socket.send(eomPacket);
+			}
+		} catch (Exception e) {
+			synchronized (clients) {
+				clients.remove(client);
+			}
+		}
+	}
+
+    private void addToCache(String message) {
+        synchronized (logCache) {
+            logCache.add(message);
+            while (logCache.size() > maxCached) {
+                logCache.remove(0);
+            }
+        }
+    }
+
+	private void broadcast(String message) {
+		addToCache(message);
+		synchronized (clients) {
+			for (int i = clients.size() - 1; i >= 0; i--) {
+				ClientEndpoint client = (ClientEndpoint) clients.get(i);
+				sendToClient(client, message);
+			}
+		}
+	}
+
+
+    public void println(String msg) {
+        broadcast(msg + "\n");
+    }
+
+    public void printStackTrace(String msg, Throwable e) {
+        broadcast(msg + "\n");
+        
         if (e != null) {
             StringWriter sw = new StringWriter();
-            try {
-                PrintWriter pw = new PrintWriter(sw);
-                try {
-                    // Walk through the entire exception chain
-                    Throwable current = e;
-                    boolean first = true;
-
-                    while (current != null) {
-                        if (!first) {
-                            pw.println("Caused by: ");
-                        }
-
-                        pw.println(current.getClass().getName() + ": " + current.getMessage());
-
-                        // Print full stack trace for this exception
-                        StackTraceElement[] stackTrace = current.getStackTrace();
-                        for (int i = 0; i < stackTrace.length; i++) {
-                            StackTraceElement element = stackTrace[i];
-                            pw.println("\tat " + element);
-                        }
-
-                        current = current.getCause();
-                        first = false;
-                    }
-                } finally {
-                    pw.close();
-                }
-                sb.append("\n");
-                sb.append(sw);
-            } finally {
-                try {
-                    sw.close();
-                } catch (Throwable ioEx) {
-                    // Do nothing
-                }
-            }
+            PrintWriter pw = new PrintWriter(sw);
+            e.printStackTrace(pw);
+            pw.close();
+            broadcast(sw.toString() + "\n");
         }
-        sb.append("\n");
-        sendString(sb.toString());
     }
 
-    /**
-     * Sends an info message over the logging socket.
-     *
-     * @param msg Message to send.
-     */
-    public void info(String msg) {
-        String message = "[INFO] " + msg + "\n";
-        sendString(message);
-    }
 
-    /**
-     * Sends a debug message over the logging socket. Debugging message will contain the information about
-     * the method that generated the log.
-     *
-     * @param msg Message to send.
-     */
-    public void debug(String msg) {
-        try {
-            // Raise an exception to print its stacktrace and extract the line that contains the caller of debug()
-            try {
-                throw new RuntimeException("Fake exception to get stack trace");
-            } catch (RuntimeException e) {
-                StringWriter sw = new StringWriter();
-                try {
-                    PrintWriter pw = new PrintWriter(sw);
-                    try {
-                        e.printStackTrace(pw);
-                    } finally {
-                        pw.close();
-                    }
+    private static class ClientEndpoint {
+        InetAddress address;
+        int port;
+        long lastSeen;
 
-                    String currentMethod = null;
-                    StringTokenizer st = new StringTokenizer(sw.toString(), "\n");
-                    for (int i = 0; i < 3 && st.hasMoreTokens(); ++i) {
-                        String line = st.nextToken();
-                        if (i == 2) {
-                            currentMethod = "[" + line.trim() + "] ";
-                        }
-                    }
+        ClientEndpoint(InetAddress address, int port) {
+            this.address = address;
+            this.port = port;
+            this.lastSeen = System.currentTimeMillis();
+        }
+        
+        void updateLastSeen() {
+            this.lastSeen = System.currentTimeMillis();
+        }
 
-                    String message = "[DEBUG] " + currentMethod + msg + "\n";
-                    sendString(message);
-                } finally {
-                    sw.close();
-                }
-            }
-        } catch (Throwable e) {
+        public boolean equals(Object obj) {
+            if (!(obj instanceof ClientEndpoint)) return false;
+            ClientEndpoint other = (ClientEndpoint) obj;
+            return port == other.port && address.equals(other.address);
+        }
 
+        public int hashCode() {
+            return address.hashCode() + port;
         }
     }
 }

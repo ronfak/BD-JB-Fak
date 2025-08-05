@@ -1,35 +1,29 @@
 # BD-JB-1250
-BD-JB for up to PS4 12.50
+BD-JB for up to PS4 12.50  
+~~This might be the exploit that was reported by TheFlow and patched at 12.52~~  
+Nope TheFlow just confirmed this is not his exploit.  
 
-~~This might be the exploit that was reported by TheFlow and patched at 12.52~~
+Just take my early Christmas gift :)  
 
-Nope TheFlow just confirmed this is not his exploit.
-
-lmao
-
-Just take my early Christmas gift :)
-
-
-No this won't work at PS5.
+No this won't work at PS5.  
 
 # Notes
-Change Status.java ip address for network logging.
+RemoteLogger server is listening on port 18194.  
+Use log_client.py to get the log.  
+I recommend first running the log_client.py then starting the BD-J app.  
 
-Default is 192.168.2.1
+RemoteJarLoader server is listening on port 9025.  
+Use jar_client.py to send the jar file.  
+You can use any other TCP payload sender too.  
+Don't forget to set Main-Class in manifest.txt.  
 
-For compiling I recommend using john-tornblom's bdj-sdk
-
-https://github.com/john-tornblom/bdj-sdk/
-
-Don't forget to replace bdjo file in BDMV
+For compiling I recommend using john-tornblom's bdj-sdk  
+https://github.com/john-tornblom/bdj-sdk/  
+Don't forget to replace bdjo file in BDMV  
 
 # Credits
-[TheFlow](https://github.com/theofficialflow) - for his BD-JB documentation and sources for native code execution
-
-[hammer-83](https://github.com/hammer-83) - for his PS5 Remote JAR Loader, it helped me a lot to learn how BD-J works
-
-[john-tornblom](https://github.com/john-tornblom) - for his BDJ-SDK, I couldn't have compiled PS4 BD-J without his BDJ-SDK
-
-
+[TheFlow](https://github.com/theofficialflow) - For his BD-JB documentation and sources for native code execution  
+[hammer-83](https://github.com/hammer-83) - For his PS5 Remote JAR Loader, it helped me a lot to learn how BD-J works  
+[john-tornblom](https://github.com/john-tornblom) - For his BDJ-SDK, I couldn't have compiled PS4 BD-J without his BDJ-SDK  
 
 

@@ -146,13 +146,13 @@ private static void runNativeBin(byte[] binData) throws Exception {
 
     // Allocate RWX memory using syscall 609 (sceKernelJitCreateSharedMemory)
     int prot = 0x1 | 0x2 | 0x4; // PROT_READ | PROT_WRITE | PROT_EXEC
-    long sharedMemFd = api.syscall(609, size, prot);
+    long sharedMemFd = api.call(609, size, prot);
     if (sharedMemFd < 0) {
         throw new RuntimeException("Failed to allocate shared memory: syscall 609 returned " + sharedMemFd);
     }
 
     // Map the shared memory into process space using syscall 615
-    long mem = api.syscall(615, sharedMemFd, 0);
+    long mem = api.call(615, sharedMemFd, 0);
     if (mem < 0) {
         throw new RuntimeException("Failed to mmap shared memory: syscall 615 returned " + mem);
     }

@@ -1,14 +1,14 @@
 JAR_NAME := helloworld.jar
 
 MAKEFILE_DIR := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
-BDJSDK_HOME  ?= $(MAKEFILE_DIR)/../../../
+BDJSDK_HOME  ?= $(MAKEFILE_DIR)/../../../../
 JAVA8_HOME    ?= $(BDJSDK_HOME)/host/jdk8
 JAVAC        := $(JAVA8_HOME)/bin/javac
 JAR          := $(JAVA8_HOME)/bin/jar
 
 export JAVA8_HOME
 
-CLASSPATH     := $(BDJSDK_HOME)/target/lib/enhanced-stubs.zip:$(BDJSDK_HOME)/target/lib/bdjstack.jar:$(BDJSDK_HOME)/target/lib/rt.jar:../discdir/BDMV/JAR/00000.jar
+CLASSPATH     := $(BDJSDK_HOME)/target/lib/enhanced-stubs.zip:$(BDJSDK_HOME)/target/lib/bdjstack.jar:$(BDJSDK_HOME)/target/lib/rt.jar:../../discdir/BDMV/JAR/00000.jar
 SOURCES       := $(wildcard src/org/bdj/external/*.java)
 JFLAGS        := -Xlint:-options -source 1.4 -target 1.4
 

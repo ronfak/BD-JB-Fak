@@ -71,20 +71,20 @@ public class RemoteLogger {
                 if ("REGISTER".equals(message)) {
                     ClientEndpoint client = new ClientEndpoint(packet.getAddress(), packet.getPort());
 
-					synchronized (clients) {
-						if (!clients.contains(client)) {
-							clients.add(client);
-							sendToClient(client, "CONNECTED from " + client.address.getHostAddress() + "\n");
-							sendCachedMessages(client);
-						} else {
-							int index = clients.indexOf(client);
-							if (index >= 0) {
-								ClientEndpoint existingClient = (ClientEndpoint) clients.get(index);
-								existingClient.updateLastSeen();
-							}
-							sendToClient(client, "ALREADY_CONNECTED from " + client.address.getHostAddress() + "\n");
-						}
-					}
+                    synchronized (clients) {
+                        if (!clients.contains(client)) {
+                            clients.add(client);
+                            sendToClient(client, "CONNECTED from " + client.address.getHostAddress() + "\n");
+                            sendCachedMessages(client);
+                        } else {
+                            int index = clients.indexOf(client);
+                            if (index >= 0) {
+                                ClientEndpoint existingClient = (ClientEndpoint) clients.get(index);
+                                existingClient.updateLastSeen();
+                            }
+                            sendToClient(client, "ALREADY_CONNECTED from " + client.address.getHostAddress() + "\n");
+                        }
+                    }
                 } else if ("HEARTBEAT_ACK".equals(message)) {
                     ClientEndpoint client = new ClientEndpoint(packet.getAddress(), packet.getPort());
                     synchronized (clients) {
@@ -98,7 +98,7 @@ public class RemoteLogger {
                 
             } catch (Exception e) {
                 if (running) {
-					
+                    
                 }
             }
         }
@@ -147,33 +147,33 @@ public class RemoteLogger {
         }
     }
 
-	private void sendToClient(ClientEndpoint client, String message) {
-		try {
-			byte[] data = message.getBytes("UTF-8");
-			
-			// Send in small chunks to avoid "packet too large" exceptions
-			// This is a UDP protocol constraint
-			int i = 0;
-			while (i < data.length) {
-				int chunkSize = Math.min(data.length - i, 1024);
-				DatagramPacket packet = new DatagramPacket(data, i, chunkSize, client.address, client.port);
-				socket.send(packet);
-				i += chunkSize;
-			}
-			
-			// Send end-of-message marker to indicate complete message
-			if (data.length > 1024) {
-				String eom = "<<EOM>>";
-				byte[] eomData = eom.getBytes("UTF-8");
-				DatagramPacket eomPacket = new DatagramPacket(eomData, eomData.length, client.address, client.port);
-				socket.send(eomPacket);
-			}
-		} catch (Exception e) {
-			synchronized (clients) {
-				clients.remove(client);
-			}
-		}
-	}
+    private void sendToClient(ClientEndpoint client, String message) {
+        try {
+            byte[] data = message.getBytes("UTF-8");
+            
+            // Send in small chunks to avoid "packet too large" exceptions
+            // This is a UDP protocol constraint
+            int i = 0;
+            while (i < data.length) {
+                int chunkSize = Math.min(data.length - i, 1024);
+                DatagramPacket packet = new DatagramPacket(data, i, chunkSize, client.address, client.port);
+                socket.send(packet);
+                i += chunkSize;
+            }
+            
+            // Send end-of-message marker to indicate complete message
+            if (data.length > 1024) {
+                String eom = "<<EOM>>";
+                byte[] eomData = eom.getBytes("UTF-8");
+                DatagramPacket eomPacket = new DatagramPacket(eomData, eomData.length, client.address, client.port);
+                socket.send(eomPacket);
+            }
+        } catch (Exception e) {
+            synchronized (clients) {
+                clients.remove(client);
+            }
+        }
+    }
 
     private void addToCache(String message) {
         synchronized (logCache) {
@@ -184,15 +184,15 @@ public class RemoteLogger {
         }
     }
 
-	private void broadcast(String message) {
-		addToCache(message);
-		synchronized (clients) {
-			for (int i = clients.size() - 1; i >= 0; i--) {
-				ClientEndpoint client = (ClientEndpoint) clients.get(i);
-				sendToClient(client, message);
-			}
-		}
-	}
+    private void broadcast(String message) {
+        addToCache(message);
+        synchronized (clients) {
+            for (int i = clients.size() - 1; i >= 0; i--) {
+                ClientEndpoint client = (ClientEndpoint) clients.get(i);
+                sendToClient(client, message);
+            }
+        }
+    }
 
 
     public void println(String msg) {

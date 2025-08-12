@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2021 Andy Nguyen
+ * Copyright (C) 2021-2024 Andy Nguyen
  *
  * This software may be modified and distributed under the terms
  * of the MIT license.  See the LICENSE file for details.
@@ -27,7 +27,7 @@ public final class API {
   private static final String JAVA_JAVA_LANG_REFLECT_ARRAY_MULTI_NEW_ARRAY_SYMBOL =
       "Java_java_lang_reflect_Array_multiNewArray";
   private static final String JVM_NATIVE_PATH_SYMBOL = "JVM_NativePath";
-  private static final String SETJMP_SYMBOL = "setjmp";
+  private static final String SIGSETJMP_SYMBOL = "sigsetjmp";
   private static final String UX86_64_SETCONTEXT_SYMBOL = "__Ux86_64_setcontext";
   private static final String ERROR_SYMBOL = "__error";
 
@@ -43,11 +43,13 @@ public final class API {
 
   private static final int[] MULTI_NEW_ARRAY_DIMENSIONS = new int[] {1};
 
+  private static final int ARRAY_BASE_OFFSET = 0x18;
+
+  private static final ThreadLocal callContexts = new ThreadLocal();
+
   private static API instance;
 
   private UnsafeInterface unsafe;
-
-  private long longValueOffset;
 
   private Object nativeLibrary;
   private Method findMethod;
@@ -57,7 +59,7 @@ public final class API {
 
   private long Java_java_lang_reflect_Array_multiNewArray;
   private long JVM_NativePath;
-  private long setjmp;
+  private long sigsetjmp;
   private long __Ux86_64_setcontext;
   private long __error;
 
@@ -88,9 +90,8 @@ public final class API {
   }
 
   private void initUnsafe() throws Exception {
-    unsafe = new UnsafeSunImpl();
-    jdk11 = false;
-    longValueOffset = unsafe.objectFieldOffset(Long.class.getDeclaredField(VALUE_FIELD_NAME));
+      unsafe = new UnsafeSunImpl();
+      jdk11 = false;
   }
 
   private void initDlsym() throws Exception {
@@ -127,7 +128,7 @@ public final class API {
     __Ux86_64_setcontext = dlsym(LIBKERNEL_MODULE_HANDLE, UX86_64_SETCONTEXT_SYMBOL);
     if (__Ux86_64_setcontext == 0) {
       // In earlier versions, there's a bug where only the main executable's handle is used.
-      executableHandle = JVM_NativePath & ~(4 - 1);
+      executableHandle = JVM_NativePath & -4;
       while (strcmp(executableHandle, UNSUPPORTED_DLOPEN_OPERATION_STRING) != 0) {
         executableHandle += 4;
       }
@@ -151,9 +152,9 @@ public final class API {
       throw new InternalError("Java_java_lang_reflect_Array_multiNewArray not found");
     }
 
-    setjmp = dlsym(LIBC_MODULE_HANDLE, SETJMP_SYMBOL);
-    if (setjmp == 0) {
-      throw new InternalError("setjmp not found");
+    sigsetjmp = dlsym(LIBKERNEL_MODULE_HANDLE, SIGSETJMP_SYMBOL);
+    if (sigsetjmp == 0) {
+      throw new InternalError("sigsetjmp not found");
     }
 
     __error = dlsym(LIBKERNEL_MODULE_HANDLE, ERROR_SYMBOL);
@@ -177,8 +178,8 @@ public final class API {
         long constants = read64(constMethod + 0x08);
         short nameIndex = read16(constMethod + 0x2A);
         short signatureIndex = read16(constMethod + 0x2C);
-        long nameSymbol = read64(constants + 0x40 + nameIndex * 8) & ~(2 - 1);
-        long signatureSymbol = read64(constants + 0x40 + signatureIndex * 8) & ~(2 - 1);
+        long nameSymbol = read64(constants + 0x40 + nameIndex * 8) & -2;
+        long signatureSymbol = read64(constants + 0x40 + signatureIndex * 8) & -2;
         short nameLength = read16(nameSymbol + 0x00);
         short signatureLength = read16(signatureSymbol + 0x00);
 
@@ -201,8 +202,8 @@ public final class API {
         long constants = read64(method + 0x18);
         short nameIndex = read16(constMethod + 0x42);
         short signatureIndex = read16(constMethod + 0x44);
-        long nameSymbol = read64(constants + 0x40 + nameIndex * 8) & ~(2 - 1);
-        long signatureSymbol = read64(constants + 0x40 + signatureIndex * 8) & ~(2 - 1);
+        long nameSymbol = read64(constants + 0x40 + nameIndex * 8) & -2;
+        long signatureSymbol = read64(constants + 0x40 + signatureIndex * 8) & -2;
         short nameLength = read16(nameSymbol + 0x08);
         short signatureLength = read16(signatureSymbol + 0x08);
 
@@ -232,8 +233,9 @@ public final class API {
   }
 
   private void buildContext(
-      long contextBuf,
-      long jmpBuf,
+      long[] contextBuf,
+      long[] jmpBuf,
+      int offset,
       long rip,
       long rdi,
       long rsi,
@@ -241,110 +243,104 @@ public final class API {
       long rcx,
       long r8,
       long r9) {
-    long rbx = read64(jmpBuf + 0x08);
-    long rsp = read64(jmpBuf + 0x10);
-    long rbp = read64(jmpBuf + 0x18);
-    long r12 = read64(jmpBuf + 0x20);
-    long r13 = read64(jmpBuf + 0x28);
-    long r14 = read64(jmpBuf + 0x30);
-    long r15 = read64(jmpBuf + 0x38);
+    long rbx = jmpBuf[(offset + 0x08) / 8];
+    long rsp = jmpBuf[(offset + 0x10) / 8];
+    long rbp = jmpBuf[(offset + 0x18) / 8];
+    long r12 = jmpBuf[(offset + 0x20) / 8];
+    long r13 = jmpBuf[(offset + 0x28) / 8];
+    long r14 = jmpBuf[(offset + 0x30) / 8];
+    long r15 = jmpBuf[(offset + 0x38) / 8];
 
-    write64(contextBuf + 0x48, rdi);
-    write64(contextBuf + 0x50, rsi);
-    write64(contextBuf + 0x58, rdx);
-    write64(contextBuf + 0x60, rcx);
-    write64(contextBuf + 0x68, r8);
-    write64(contextBuf + 0x70, r9);
-    write64(contextBuf + 0x80, rbx);
-    write64(contextBuf + 0x88, rbp);
-    write64(contextBuf + 0xA0, r12);
-    write64(contextBuf + 0xA8, r13);
-    write64(contextBuf + 0xB0, r14);
-    write64(contextBuf + 0xB8, r15);
-    write64(contextBuf + 0xE0, rip);
-    write64(contextBuf + 0xF8, rsp);
-
-    write64(contextBuf + 0x110, 0);
-    write64(contextBuf + 0x118, 0);
+    contextBuf[(offset + 0x48) / 8] = rdi;
+    contextBuf[(offset + 0x50) / 8] = rsi;
+    contextBuf[(offset + 0x58) / 8] = rdx;
+    contextBuf[(offset + 0x60) / 8] = rcx;
+    contextBuf[(offset + 0x68) / 8] = r8;
+    contextBuf[(offset + 0x70) / 8] = r9;
+    contextBuf[(offset + 0x80) / 8] = rbx;
+    contextBuf[(offset + 0x88) / 8] = rbp;
+    contextBuf[(offset + 0xA0) / 8] = r12;
+    contextBuf[(offset + 0xA8) / 8] = r13;
+    contextBuf[(offset + 0xB0) / 8] = r14;
+    contextBuf[(offset + 0xB8) / 8] = r15;
+    contextBuf[(offset + 0xE0) / 8] = rip;
+    contextBuf[(offset + 0xF8) / 8] = rsp;
   }
 
   public long call(long func, long arg0, long arg1, long arg2, long arg3, long arg4, long arg5) {
-    long fakeClassOop = malloc(Int64.SIZE);
-    long fakeClass = malloc(0x100);
-    long fakeKlass = malloc(0x200);
-    long fakeKlassVtable = malloc(0x400);
+    long ret = 0;
 
-    if (fakeClassOop == 0 || fakeClass == 0 || fakeKlass == 0 || fakeKlassVtable == 0) {
-      throw new OutOfMemoryError("malloc failed");
-    }
+    // When func is 0, only do one iteration to avoid calling __Ux86_64_setcontext.
+    // This is used to "train" this function to kick in optimization early. Otherwise, it is
+    // possible that optimization kicks in between the calls to sigsetjmp and __Ux86_64_setcontext
+    // leading to different stack layouts of the two calls.
+    int iter = func == 0 ? 1 : 2;
 
-    try {
-      long ret = 0;
+    CallContext callContext = getCallContext();
 
-      // When func is 0, only do one iteration to avoid calling __Ux86_64_setcontext.
-      // This is used to "train" this function to kick in optimization early. Otherwise, it is
-      // possible that optimization kicks in between the calls to setjmp and __Ux86_64_setcontext
-      // leading to different stack layouts of the two calls.
-      int iter = func == 0 ? 1 : 2;
+    if (jdk11) {
+      callContext.fakeKlass[0xC0 / 8] = 0; // dimension
 
-      if (jdk11) {
-        write64(fakeClassOop + 0x00, fakeClass);
-        write64(fakeClass + 0x98, fakeKlass);
-        write32(fakeKlass + 0xC4, 0); // dimension
-        write64(fakeKlassVtable + 0xD8, JVM_NativePath); // array_klass
-
-        for (int i = 0; i < iter; i++) {
-          write64(fakeKlass + 0x00, fakeKlassVtable);
-          write64(fakeKlass + 0x00, fakeKlassVtable);
-          if (i == 0) {
-            write64(fakeKlassVtable + 0x158, setjmp); // multi_allocate
-          } else {
-            write64(fakeKlassVtable + 0x158, __Ux86_64_setcontext); // multi_allocate
-          }
-
-          ret = multiNewArray(fakeClassOop, MULTI_NEW_ARRAY_DIMENSIONS);
-
-          if (i == 0) {
-            buildContext(
-                fakeKlass + 0x00, fakeKlass + 0x00, func, arg0, arg1, arg2, arg3, arg4, arg5);
-          }
+      for (int i = 0; i < iter; i++) {
+        callContext.fakeKlass[0x00 / 8] = callContext.fakeKlassVtableAddr;
+        callContext.fakeKlass[0x00 / 8] = callContext.fakeKlassVtableAddr;
+        if (i == 0) {
+          callContext.fakeKlassVtable[0x158 / 8] = sigsetjmp + 0x23; // multi_allocate
+        } else {
+          callContext.fakeKlassVtable[0x158 / 8] = __Ux86_64_setcontext + 0x39; // multi_allocate
         }
-      } else {
-        write64(fakeClassOop + 0x00, fakeClass);
-        write64(fakeClass + 0x68, fakeKlass);
-        write32(fakeKlass + 0xBC, 0); // dimension
-        write64(fakeKlassVtable + 0x80, JVM_NativePath); // array_klass
-        write64(fakeKlassVtable + 0xF0, JVM_NativePath); // oop_is_array
 
-        for (int i = 0; i < iter; i++) {
-          write64(fakeKlass + 0x10, fakeKlassVtable);
-          write64(fakeKlass + 0x20, fakeKlassVtable);
-          if (i == 0) {
-            write64(fakeKlassVtable + 0x230, setjmp); // multi_allocate
-          } else {
-            write64(fakeKlassVtable + 0x230, __Ux86_64_setcontext); // multi_allocate
-          }
+        ret = multiNewArray(callContext.fakeClassOopAddr, MULTI_NEW_ARRAY_DIMENSIONS);
 
-          ret = multiNewArray(fakeClassOop, MULTI_NEW_ARRAY_DIMENSIONS);
-
-          if (i == 0) {
-            buildContext(
-                fakeKlass + 0x20, fakeKlass + 0x20, func, arg0, arg1, arg2, arg3, arg4, arg5);
-          }
+        if (i == 0) {
+          buildContext(
+              callContext.fakeKlass,
+              callContext.fakeKlass,
+              0x00,
+              func,
+              arg0,
+              arg1,
+              arg2,
+              arg3,
+              arg4,
+              arg5);
         }
       }
+    } else {
+      callContext.fakeKlass[0xB8 / 8] = 0; // dimension
 
-      if (ret == 0) {
-        return 0;
+      for (int i = 0; i < iter; i++) {
+        callContext.fakeKlass[0x10 / 8] = callContext.fakeKlassVtableAddr;
+        callContext.fakeKlass[0x20 / 8] = callContext.fakeKlassVtableAddr;
+        if (i == 0) {
+          callContext.fakeKlassVtable[0x230 / 8] = sigsetjmp + 0x23; // multi_allocate
+        } else {
+          callContext.fakeKlassVtable[0x230 / 8] = __Ux86_64_setcontext + 0x39; // multi_allocate
+        }
+
+        ret = multiNewArray(callContext.fakeClassOopAddr, MULTI_NEW_ARRAY_DIMENSIONS);
+
+        if (i == 0) {
+          buildContext(
+              callContext.fakeKlass,
+              callContext.fakeKlass,
+              0x20,
+              func,
+              arg0,
+              arg1,
+              arg2,
+              arg3,
+              arg4,
+              arg5);
+        }
       }
-
-      return read64(ret);
-    } finally {
-      free(fakeKlassVtable);
-      free(fakeKlass);
-      free(fakeClass);
-      free(fakeClassOop);
     }
+
+    if (ret == 0) {
+      return 0;
+    }
+
+    return read64(ret);
   }
 
   public long call(long func, long arg0, long arg1, long arg2, long arg3, long arg4) {
@@ -399,9 +395,8 @@ public final class API {
   }
 
   public long addrof(Object obj) {
-    Long val = new Long(1337);
-    unsafe.putObject(val, longValueOffset, obj);
-    return unsafe.getLong(val, longValueOffset);
+    Object[] array = new Object[] {obj};
+    return unsafe.getLong(array, ARRAY_BASE_OFFSET);
   }
 
   public byte read8(long addr) {
@@ -438,6 +433,14 @@ public final class API {
 
   public long malloc(long size) {
     return unsafe.allocateMemory(size);
+  }
+
+  public long calloc(long number, long size) {
+    long p = malloc(number * size);
+    if (p != 0) {
+      memset(p, 0, number * size);
+    }
+    return p;
   }
 
   public long realloc(long ptr, long size) {
@@ -579,5 +582,108 @@ public final class API {
     byte[] bytes = new byte[str.length() + 1];
     System.arraycopy(str.getBytes(), 0, bytes, 0, str.length());
     return bytes;
+  }
+
+  private CallContext getCallContext() {
+    CallContext callContext = (CallContext) callContexts.get();
+    if (callContext != null) {
+      return callContext;
+    }
+
+    callContext = new CallContext();
+    callContexts.set(callContext);
+    return callContext;
+  }
+
+  class CallContext {
+    final long[] fakeClassOop;
+    final long[] fakeClass;
+    final long[] fakeKlass;
+    final long[] fakeKlassVtable;
+
+    final long fakeClassOopAddr;
+    final long fakeClassAddr;
+    final long fakeKlassAddr;
+    final long fakeKlassVtableAddr;
+
+    private final long callContextBuffer;
+
+    CallContext() {
+      callContextBuffer =
+          malloc(
+              ARRAY_BASE_OFFSET
+                  + Int64.SIZE
+                  + ARRAY_BASE_OFFSET
+                  + 0x100
+                  + ARRAY_BASE_OFFSET
+                  + 0x200
+                  + ARRAY_BASE_OFFSET
+                  + 0x400);
+      if (callContextBuffer == 0) {
+        throw new OutOfMemoryError("malloc failed");
+      }
+
+      // Get array addresses.
+      fakeClassOopAddr = callContextBuffer + ARRAY_BASE_OFFSET;
+      fakeClassAddr = fakeClassOopAddr + Int64.SIZE + ARRAY_BASE_OFFSET;
+      fakeKlassAddr = fakeClassAddr + 0x100 + ARRAY_BASE_OFFSET;
+      fakeKlassVtableAddr = fakeKlassAddr + 0x200 + ARRAY_BASE_OFFSET;
+
+      long[] array = new long[1];
+      long arrayAddr = addrof(array);
+      long arrayKlass = read64(arrayAddr + 0x08);
+
+      // Write array headers.
+      write64(fakeClassOopAddr - 0x18, 1);
+      write64(fakeClassAddr - 0x18, 1);
+      write64(fakeKlassAddr - 0x18, 1);
+      write64(fakeKlassVtableAddr - 0x18, 1);
+
+      write64(fakeClassOopAddr - 0x10, arrayKlass);
+      write64(fakeClassAddr - 0x10, arrayKlass);
+      write64(fakeKlassAddr - 0x10, arrayKlass);
+      write64(fakeKlassVtableAddr - 0x10, arrayKlass);
+
+      write64(fakeClassOopAddr - 8, 0xFFFFFFFF);
+      write64(fakeClassAddr - 8, 0xFFFFFFFF);
+      write64(fakeKlassAddr - 8, 0xFFFFFFFF);
+      write64(fakeKlassVtableAddr - 8, 0xFFFFFFFF);
+
+      long[][] callContextArray = new long[4][0];
+      long callContextArrayAddr = addrof(callContextArray) + ARRAY_BASE_OFFSET;
+
+      // Put array addresses into callContextArray.
+      write64(callContextArrayAddr + 0x00, fakeClassOopAddr - ARRAY_BASE_OFFSET);
+      write64(callContextArrayAddr + 0x08, fakeClassAddr - ARRAY_BASE_OFFSET);
+      write64(callContextArrayAddr + 0x10, fakeKlassAddr - ARRAY_BASE_OFFSET);
+      write64(callContextArrayAddr + 0x18, fakeKlassVtableAddr - ARRAY_BASE_OFFSET);
+
+      // Get fake arrays.
+      fakeClassOop = callContextArray[0];
+      fakeClass = callContextArray[1];
+      fakeKlass = callContextArray[2];
+      fakeKlassVtable = callContextArray[3];
+
+      // Restore.
+      write64(callContextArrayAddr + 0x00, 0);
+      write64(callContextArrayAddr + 0x08, 0);
+      write64(callContextArrayAddr + 0x10, 0);
+      write64(callContextArrayAddr + 0x18, 0);
+
+      if (jdk11) {
+        fakeClassOop[0x00 / 8] = fakeClassAddr;
+        fakeClass[0x98 / 8] = fakeKlassAddr;
+        fakeKlassVtable[0xD8 / 8] = JVM_NativePath; // array_klass
+      } else {
+        fakeClassOop[0x00 / 8] = fakeClassAddr;
+        fakeClass[0x68 / 8] = fakeKlassAddr;
+        fakeKlassVtable[0x80 / 8] = JVM_NativePath; // array_klass
+        fakeKlassVtable[0xF0 / 8] = JVM_NativePath; // oop_is_array
+      }
+    }
+
+    protected void finalize() {
+      free(callContextBuffer);
+    }
   }
 }

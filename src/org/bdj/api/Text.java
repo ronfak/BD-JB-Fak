@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2021 Andy Nguyen
+ * Copyright (C) 2021-2024 Andy Nguyen
  *
  * This software may be modified and distributed under the terms
  * of the MIT license.  See the LICENSE file for details.
@@ -8,7 +8,7 @@
 package org.bdj.api;
 
 public class Text extends Buffer {
-  private String text;
+  private final String text;
 
   public Text(String text) {
     super(text.length() + 1);

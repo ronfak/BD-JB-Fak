@@ -15,7 +15,7 @@
 # <http://www.gnu.org/licenses/>.
 
 
-DISC_LABEL := helloworld
+DISC_LABEL := RemoteJarLoader
 
 #
 # Host tools
@@ -75,6 +75,3 @@ $(DISC_LABEL).iso: $(DISC_FILES)
 clean:
 	rm -rf META-INF $(DISC_LABEL).iso discdir src/org/bdj/*.class src/org/bdj/sandbox/*.class src/org/bdj/api/*.class
 
-
-test: $(DISC_LABEL).iso
-	vlc $<

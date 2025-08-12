@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2021 Andy Nguyen
+ * Copyright (C) 2021-2024 Andy Nguyen
  *
  * This software may be modified and distributed under the terms
  * of the MIT license.  See the LICENSE file for details.
@@ -22,24 +22,13 @@ public class Buffer {
 
   private final int size;
 
-  private final boolean allocated;
-
   public Buffer(int size) {
-    this.address = api.malloc(size);
+    this.address = api.calloc(1, size);
     this.size = size;
-    this.allocated = true;
   }
 
-  public Buffer(long address, int size) {
-    this.address = address;
-    this.size = size;
-    this.allocated = false;
-  }
-
-  public void finalize() {
-    if (allocated) {
-      api.free(address);
-    }
+  protected void finalize() {
+    api.free(address);
   }
 
   public long address() {

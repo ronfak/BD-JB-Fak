@@ -10,8 +10,8 @@ import java.util.jar.Attributes;
 public class RemoteJarLoader implements Runnable {
     
     public RemoteJarLoader() {
-		cleanupOldTempFiles();
-	}
+        cleanupOldTempFiles();
+    }
     
     public void run() {
         try {
@@ -20,8 +20,6 @@ public class RemoteJarLoader implements Runnable {
             
             while (true) {
                 Socket client = server.accept();
-                Status.println("Client connected");
-                
                 try {
                     loadAndRunJar(client);
                 } catch (Exception e) {
@@ -29,7 +27,7 @@ public class RemoteJarLoader implements Runnable {
                 }
                 
                 client.close();
-				Status.println("Waiting for next JAR on port 9025...");
+                Status.println("Waiting for next JAR on port 9025...");
             }
         } catch (IOException e) {
             Status.printStackTrace("Server error", e);
@@ -51,7 +49,6 @@ public class RemoteJarLoader implements Runnable {
         while ((bytesRead = input.read(buffer)) != -1) {
             output.write(buffer, 0, bytesRead);
             totalBytes += bytesRead;
-            Status.println("Received " + totalBytes + " bytes");
         }
         
         output.close();
@@ -77,8 +74,6 @@ public class RemoteJarLoader implements Runnable {
             throw new Exception("No Main-Class specified in manifest");
         }
         
-        Status.println("Main class: " + mainClassName);
-        
         ClassLoader parentLoader = RemoteJarLoader.class.getClassLoader();
         ClassLoader bypassRestrictionsLoader = new URLClassLoader(new URL[0], parentLoader) {
             protected Class loadClass(String name, boolean resolve) throws ClassNotFoundException {
@@ -99,9 +94,8 @@ public class RemoteJarLoader implements Runnable {
         Status.println("Running " + mainClassName + "...");
         mainMethod.invoke(null, new Object[]{new String[0]});
         
-        Status.println("Execution completed");
+        Status.println(mainClassName + " execution completed");
     }
-	
 
     private void cleanupOldTempFiles() {
         try {

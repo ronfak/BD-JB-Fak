@@ -5,13 +5,13 @@ import javax.microedition.xlet.XletContext;
 import javax.microedition.xlet.XletStateChangeException;
 
 public class Dummy implements Xlet {
-	
-	public void initXlet(XletContext ctx) throws XletStateChangeException { }
+    
+    public void initXlet(XletContext ctx) throws XletStateChangeException { }
   
-	public void startXlet() throws XletStateChangeException {  }
+    public void startXlet() throws XletStateChangeException {  }
   
-	public void pauseXlet() {  }
+    public void pauseXlet() {  }
   
-	public void destroyXlet(boolean unconditional) throws XletStateChangeException {  }
+    public void destroyXlet(boolean unconditional) throws XletStateChangeException {  }
   
 }

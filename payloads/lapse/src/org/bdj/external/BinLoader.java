@@ -5,9 +5,11 @@ import java.io.InputStream;
 import java.io.ByteArrayOutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.Buffer;
 
 import org.bdj.Status;
 import org.bdj.api.*;
+import org.w3c.dom.Text;
 
 public class BinLoader {
     // File io
@@ -41,7 +43,8 @@ public class BinLoader {
     private static final int COPY_CHUNK_SIZE = 8192;
     
     // File paths
-    private static final String USB_PAYLOAD_PATH = "/mnt/usb0/payload.bin";
+    private static final String USB_PAYLOAD_PATH_FMT = "/mnt/usb%,d/payload.bin";
+    private static String USB_PAYLOAD_PATH = null;
     private static final String DATA_PAYLOAD_PATH = "/data/payload.bin";
     
     private static API api;
@@ -91,7 +94,9 @@ public class BinLoader {
     
     private static void runBinLoader() {
         Status.println("=== BinLoader Starting ===");
-        
+        // Set USB_PAYLOAD_PATH by checking various USB drive nums.
+        SetUsbDrive();
+
         // Priority 1: Check for USB payload and copy to data
         if (fileExists(USB_PAYLOAD_PATH)) {
             Status.println("Found USB payload, copying to data directory...");
@@ -432,6 +437,23 @@ public class BinLoader {
         }
     }
         
+    private static void SetUsbDrive()
+    {
+        try {
+            for(int i = 0 ; i < 4; i++)
+            {
+                String testStr = String.format(USB_PAYLOAD_PATH_FMT,i);
+                if(fileExists(testStr))
+                {
+                    USB_PAYLOAD_PATH = String.format(USB_PAYLOAD_PATH_FMT,i);
+                    break;
+                }
+            }
+            } catch (Exception e) {
+                Status.println("Error getting USB Drive location: " + e.getMessage());
+            }
+    }
+
 
     public static boolean fileExists(String filePath) {
         try {
@@ -461,10 +483,10 @@ public class BinLoader {
                 return false;
             }
             
-        } catch (Exception e) {
-            Status.println("Error checking file existence: " + e.getMessage());
-            return false;
-        }
+            } catch (Exception e) {
+                Status.println("Error checking file existence: " + e.getMessage());
+                return false;
+            }
     }
 
     public static void executePayloadFromPath(String payloadDataPath) {

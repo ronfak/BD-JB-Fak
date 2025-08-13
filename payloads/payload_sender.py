@@ -17,7 +17,7 @@ if __name__ == "__main__":
         port = int(sys.argv[3]) if len(sys.argv) > 3 else 9025
         send_jar(sys.argv[1], host, port)
     else:
-        print("Usage: python jar_client.py <jar_file> <host> [port]")
+        print("Usage: python payload_sender.py <file> <host> [port]")
         print("Examples:")
-        print("  python jar_client.py helloworld.jar 192.168.1.100")
-        print("  python jar_client.py helloworld.jar 192.168.1.100 9025")
+        print("  python payload_sender.py helloworld.jar 192.168.1.100")
+        print("  python payload_sender.py payload.bin 192.168.1.100 9020")

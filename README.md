@@ -13,9 +13,14 @@ Use log_client.py to get the log.
 I recommend first running the log_client.py then starting the BD-J app.  
 
 RemoteJarLoader server is listening on port 9025.  
-Use jar_client.py to send the jar file.  
+Use payload_sender.py to send the jar file.  
 You can use any other TCP payload sender too.  
 Don't forget to set Main-Class in manifest.txt.  
+
+The Lapse jar payload will automatically load the binary payload from /mnt/usb0/payload.bin and copy it to /data/payload.bin  
+If binary payload is not present at either of these paths, it will start a binLoader server listening on port 9020.  
+Use payload_sender.py to send the binary file.  
+You can use any other TCP payload sender too.  
 
 For compiling I recommend using john-tornblom's bdj-sdk  
 https://github.com/john-tornblom/bdj-sdk/  

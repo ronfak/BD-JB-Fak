@@ -22,6 +22,8 @@ Lapse jar payload will automatically load the binary payload from /mnt/usb0/payl
 If binary payload is not present at either of these paths, it will start a binLoader server listening on port 9020.  
 Use payload_sender.py to send the binary file.  
 You can use any other TCP payload sender too.  
+Always restart PS4 when exploit failed.  
+Reopening BD-J app without rebooting will make exploit worse.  
 
 For compiling I recommend using john-tornblom's bdj-sdk  
 https://github.com/john-tornblom/bdj-sdk/  
@@ -32,3 +34,4 @@ Don't forget to replace bdjo file in BDMV
 [hammer-83](https://github.com/hammer-83) - For his PS5 Remote JAR Loader, it helped me a lot to learn how BD-J works  
 [john-tornblom](https://github.com/john-tornblom) - For his BDJ-SDK, I couldn't have compiled PS4 BD-J without his BDJ-SDK  
 [shahrilnet, null_ptr](https://github.com/shahrilnet/remote_lua_loader) - For lua lapse implementation, without it BD-J implementation was impossible  
+

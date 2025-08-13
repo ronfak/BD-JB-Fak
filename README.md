@@ -31,6 +31,4 @@ Don't forget to replace bdjo file in BDMV
 [TheFlow](https://github.com/theofficialflow) - For his BD-JB documentation and sources for native code execution  
 [hammer-83](https://github.com/hammer-83) - For his PS5 Remote JAR Loader, it helped me a lot to learn how BD-J works  
 [john-tornblom](https://github.com/john-tornblom) - For his BDJ-SDK, I couldn't have compiled PS4 BD-J without his BDJ-SDK  
-
-
-
+[shahrilnet, null_ptr](https://github.com/shahrilnet/remote_lua_loader) - For lua lapse implementation, without it BD-J implementation was impossible  

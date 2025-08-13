@@ -17,7 +17,8 @@ Use payload_sender.py to send the jar file.
 You can use any other TCP payload sender too.  
 Don't forget to set Main-Class in manifest.txt.  
 
-The Lapse jar payload will automatically load the binary payload from /mnt/usb0/payload.bin and copy it to /data/payload.bin  
+Lapse is only for 9.00 to 12.02  
+Lapse jar payload will automatically load the binary payload from /mnt/usb0/payload.bin and copy it to /data/payload.bin  
 If binary payload is not present at either of these paths, it will start a binLoader server listening on port 9020.  
 Use payload_sender.py to send the binary file.  
 You can use any other TCP payload sender too.  
@@ -30,5 +31,6 @@ Don't forget to replace bdjo file in BDMV
 [TheFlow](https://github.com/theofficialflow) - For his BD-JB documentation and sources for native code execution  
 [hammer-83](https://github.com/hammer-83) - For his PS5 Remote JAR Loader, it helped me a lot to learn how BD-J works  
 [john-tornblom](https://github.com/john-tornblom) - For his BDJ-SDK, I couldn't have compiled PS4 BD-J without his BDJ-SDK  
+
 
 

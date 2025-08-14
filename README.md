@@ -11,7 +11,6 @@ No this won't work at PS5.
 ---
 
 ## Lapse Exploit (Firmware 9.00 – 12.02 Only)
-(9.00, 9.03 has issue do not burn Lapse.iso yet)
 
 ---
 
@@ -107,6 +106,7 @@ Replace the BDJO file in `BDMV` when building.
 * **[shahrilnet, null\_ptr](https://github.com/shahrilnet/remote_lua_loader)** — Lua Lapse implementation, without which BD-J Lapse was impossible.
 
 ---
+
 
 
 

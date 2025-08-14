@@ -76,11 +76,11 @@ This exploit requires burning a Blu-ray ISO file onto a disc. Recommended tools:
 
 * **Windows**: Use **ImgBurn** — a lightweight and reliable disc-burning application.
 
-  * Official site: [ImgBurn Download](https://www.imgburn.com/?utm_source=chatgpt.com)
+  * Official site: [ImgBurn Download](https://www.imgburn.com)
 
 * **Linux**: Use **K3b** — KDE’s disc-burning application with full Blu-ray support.
 
-  * Official site: [K3b on KDE Apps](https://apps.kde.org/k3b/?utm_source=chatgpt.com)
+  * Official site: [K3b on KDE Apps](https://apps.kde.org/k3b/)
 
 ---
 
@@ -113,6 +113,7 @@ Don’t forget to replace the **BDJO** file in `BDMV`.
 * **[shahrilnet, null_ptr](https://github.com/shahrilnet/remote_lua_loader)** — For Lua Lapse implementation, without which BD-J implementation was impossible.
 
 ---
+
 
 
 

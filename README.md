@@ -21,7 +21,7 @@ You will find **two ISOs** in the release:
 
 * **`Lapse.iso`** — Contains the Lapse JAR payload built in.
 
-  * Automatically loads `/mnt/usb0/payload.bin` and copies it to `/data/payload.bin`.
+  * Automatically loads `payload.bin` in USB and copies it to `/data/payload.bin`.
   * If `payload.bin` is missing, launches a **binLoader server** on port **9020** to receive a binary payload.
 * **`RemoteJarLoader.iso`** — Allows you to send your own JAR payload via port **9025**.
 
@@ -58,7 +58,7 @@ You will find **two ISOs** in the release:
 2. Insert the **Blu-ray disc** (burned with `Lapse.iso` or `RemoteJarLoader.iso`).
 3. Wait for payload delivery:
 
-   * With **Lapse.iso**: payload.bin loads from USB → /data/payload.bin
+   * With **Lapse.iso**: payload.bin loads from USB → /data/payload.bin (If USB is not plugged in)
    * With **RemoteJarLoader**: send JAR payload to port **9025**.
 4. If exploit fails → **Restart the PS4** before retrying.
 
@@ -107,6 +107,7 @@ Replace the BDJO file in `BDMV` when building.
 * **[shahrilnet, null\_ptr](https://github.com/shahrilnet/remote_lua_loader)** — Lua Lapse implementation, without which BD-J Lapse was impossible.
 
 ---
+
 
 
 

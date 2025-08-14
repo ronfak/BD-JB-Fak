@@ -55,8 +55,6 @@ public class RemoteJarLoader implements Runnable {
         Status.println("JAR received: " + totalBytes + " bytes total");
         
         runJar(tempJar);
-        
-        tempJar.delete();
     }
     
     private static void runJar(File jarFile) throws Exception {

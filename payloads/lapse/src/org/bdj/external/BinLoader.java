@@ -10,18 +10,6 @@ import org.bdj.Status;
 import org.bdj.api.*;
 
 public class BinLoader {
-    // File io
-    private static final int O_RDONLY = 0x0;
-    private static final int O_WRONLY = 0x1;
-    private static final int O_RDWR = 0x2;
-    private static final int O_CREAT = 0x200;
-    private static final int O_TRUNC = 0x400;
-    private static final int O_NONBLOCK = 0x4;
-
-    private static final int ENOENT = 2;   // No such file or directory
-    private static final int EACCES = 13;  // Permission denied
-    private static final int EISDIR = 21;  // Is a directory
-
     // Memory mapping constants
     private static final int PROT_READ = 0x1;
     private static final int PROT_WRITE = 0x2;
@@ -38,11 +26,8 @@ public class BinLoader {
     // Network constants
     private static final int NETWORK_PORT = 9020;
     private static final int READ_CHUNK_SIZE = 4096;
-    private static final int COPY_CHUNK_SIZE = 8192;
     
-    // File paths
-    private static final String USB_PAYLOAD_PATH = "/mnt/usb0/payload.bin";
-    private static final String DATA_PAYLOAD_PATH = "/data/payload.bin";
+    private static final String USBPAYLOAD_RESOURCE = "/org/bdj/external/USBpayload.elf";
     
     private static API api;
     private static byte[] binData;
@@ -50,8 +35,6 @@ public class BinLoader {
     private static long mmapSize;
     private static long entryPoint;
     private static Thread payloadThread;
-    private static Thread binLoaderThread;
-    private static boolean isRunning = false;
 
     static {
         try {
@@ -62,148 +45,90 @@ public class BinLoader {
     }
 
     public static void start() {
-        if (isRunning) {
-            Status.println("BinLoader is already running");
-            return;
-        }
-        
-        Status.println("Starting BinLoader in background thread...");
-        
-        binLoaderThread = new Thread(new Runnable() {
+        Thread startThread = new Thread(new Runnable() {
             public void run() {
-                try {
-                    isRunning = true;
-                    runBinLoader();
-                } catch (Exception e) {
-                    Status.println("BinLoader thread error: " + e.getMessage());
-                    e.printStackTrace();
-                } finally {
-                    isRunning = false;
-                }
+                startInternal();
             }
         });
-        
-        binLoaderThread.setName("BinLoaderThread");
-        binLoaderThread.start();
-        
-        Status.println("BinLoader thread started successfully");
+        startThread.setName("BinLoader");
+        startThread.start();
     }
     
-    private static void runBinLoader() {
+    private static void startInternal() {
         Status.println("=== BinLoader Starting ===");
-        
-        // Priority 1: Check for USB payload and copy to data
-        if (fileExists(USB_PAYLOAD_PATH)) {
-            Status.println("Found USB payload, copying to data directory...");
-            
-            try {
-                copyFile(USB_PAYLOAD_PATH, DATA_PAYLOAD_PATH);
-                Status.println("Successfully copied payload to: " + DATA_PAYLOAD_PATH);
-                
-                // Execute from data location
-                executePayloadFromPath(DATA_PAYLOAD_PATH);
-                return;
-                
-            } catch (Exception e) {
-                Status.println("Failed to copy USB payload: " + e.getMessage());
-                Status.println("Attempting to execute directly from USB...");
-                
-                try {
-                    executePayloadFromPath(USB_PAYLOAD_PATH);
-                    return;
-                } catch (Exception e2) {
-                    Status.println("Failed to execute from USB: " + e2.getMessage());
-                }
-            }
-        }
-        
-        // Priority 2: Check for existing payload in data directory
-        if (fileExists(DATA_PAYLOAD_PATH)) {
-            Status.println("Found existing payload in data directory, executing...");
-            executePayloadFromPath(DATA_PAYLOAD_PATH);
-            return;
-        }
-        
-        // Priority 3: Start network server
-        Status.println("No payload files found, starting network server...");
-        listenForPayloadOnPort(NETWORK_PORT);
+
+        executeEmbeddedPayload();
+        listenForPayloadsOnPort(NETWORK_PORT);
     }
     
+    private static void executeEmbeddedPayload() {
+        try {
+            byte[] embeddedData = loadResourcePayload(USBPAYLOAD_RESOURCE);
+            
+            loadFromData(embeddedData);
+            run();
+            waitForPayloadToExit();
 
-    private static void copyFile(String sourcePath, String destPath) throws Exception {
-        Text sourceText = new Text(sourcePath);
-        Text destText = new Text(destPath);
-
-        long sourceFd = Helper.syscall(Helper.SYS_OPEN, sourceText.address(), (long)O_RDONLY, 0L);
-        if (sourceFd < 0) {
-            throw new RuntimeException("Failed to open source file: " + sourcePath + " (fd: " + sourceFd + ")");
+        } catch (Exception e) {
+            Status.println("Error executing embedded payload: " + e.getMessage());
         }
+    }
+    
+    private static byte[] loadResourcePayload(String resourcePath) throws Exception {
+        InputStream inputStream = BinLoader.class.getResourceAsStream(resourcePath);
+        if (inputStream == null) {
+            throw new RuntimeException("Resource not found: " + resourcePath);
+        }
+        
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        byte[] buffer = new byte[READ_CHUNK_SIZE];
+        int bytesRead;
+        int totalRead = 0;
         
         try {
-            long destFd = Helper.syscall(Helper.SYS_OPEN, destText.address(), 
-                                       (long)(O_WRONLY | O_CREAT | O_TRUNC), 0644L);
-            if (destFd < 0) {
-                throw new RuntimeException("Failed to create destination file: " + destPath + " (fd: " + destFd + ")");
+            while ((bytesRead = inputStream.read(buffer)) != -1) {
+                outputStream.write(buffer, 0, bytesRead);
+                totalRead += bytesRead;
+                
+                // Safety check to prevent excessive resource loading
+                if (totalRead > MAX_PAYLOAD_SIZE) {
+                    throw new RuntimeException("Resource payload exceeds maximum size: " + MAX_PAYLOAD_SIZE);
+                }
             }
             
-            try {
-                Buffer copyBuffer = new Buffer(COPY_CHUNK_SIZE);
-                long totalBytesCopied = 0;
-                
-                while (true) {
-                    long bytesRead = Helper.syscall(Helper.SYS_READ, sourceFd, copyBuffer.address(), (long)COPY_CHUNK_SIZE);
-                    
-                    if (bytesRead < 0) {
-                        throw new RuntimeException("Read error during copy: " + bytesRead);
-                    }
-                    
-                    if (bytesRead == 0) {
-                        // EOF reached
-                        break;
-                    }
-                    
-                    long bytesWritten = Helper.syscall(Helper.SYS_WRITE, destFd, copyBuffer.address(), bytesRead);
-                    if (bytesWritten != bytesRead) {
-                        throw new RuntimeException("Write error during copy: expected " + bytesRead + ", wrote " + bytesWritten);
-                    }
-                    
-                    totalBytesCopied += bytesWritten;
-                    
-                    if (totalBytesCopied > MAX_PAYLOAD_SIZE) {
-                        throw new RuntimeException("File too large during copy: " + totalBytesCopied + " bytes");
-                    }
-                }
-                
-                Status.println("Successfully copied " + totalBytesCopied + " bytes from " + sourcePath + " to " + destPath);
-                
-            } finally {
-                long closeResult = Helper.syscall(Helper.SYS_CLOSE, destFd);
-                if (closeResult < 0) {
-                    Status.println("Warning: Failed to close destination file: " + closeResult);
-                }
-            }
+            return outputStream.toByteArray();
             
         } finally {
-            long closeResult = Helper.syscall(Helper.SYS_CLOSE, sourceFd);
-            if (closeResult < 0) {
-                Status.println("Warning: Failed to close source file: " + closeResult);
-            }
+            inputStream.close();
+            outputStream.close();
         }
     }
-
-
-    public static void loadFromFile(String filePath) throws Exception {
-        byte[] data = readFile(filePath);
-        Status.println("Loaded payload from: " + filePath + " (size: " + data.length + " bytes)");
-        
-        loadFromData(data);
-    }
-
+	
     public static void loadFromData(byte[] data) throws Exception {
+        if (data == null) {
+            throw new IllegalArgumentException("Payload data cannot be null");
+        }
+        
+        if (data.length == 0) {
+            throw new IllegalArgumentException("Payload data cannot be empty");
+        }
+        
+        if (data.length > MAX_PAYLOAD_SIZE) {
+            throw new IllegalArgumentException("Payload too large: " + data.length + " bytes (max: " + MAX_PAYLOAD_SIZE + ")");
+        }
+        
         binData = data;
         
-        // Round up to page boundary
-        long mmapSizeCalc = roundUp(data.length, PAGE_SIZE);
+        // Round up to page boundary with overflow check
+        long mmapSizeCalc;
+        try {
+            mmapSizeCalc = roundUp(data.length, PAGE_SIZE);
+            if (mmapSizeCalc <= 0 || mmapSizeCalc > MAX_PAYLOAD_SIZE * 2) {
+                throw new RuntimeException("Invalid mmap size calculation: " + mmapSizeCalc);
+            }
+        } catch (ArithmeticException e) {
+            throw new RuntimeException("Integer overflow in mmap size calculation");
+        }
         
         // Allocate executable memory
         int protFlags = PROT_READ | PROT_WRITE | PROT_EXEC;
@@ -211,70 +136,113 @@ public class BinLoader {
         
         long ret = Helper.syscall(Helper.SYS_MMAP, 0L, mmapSizeCalc, (long)protFlags, (long)mapFlags, -1L, 0L);
         if (ret < 0) {
-            throw new RuntimeException("mmap() failed with error: " + ret);
+            int errno = api.errno();
+            throw new RuntimeException("mmap() failed with error: " + ret + " (errno: " + errno + ")");
+        }
+        
+        // Validate mmap returned a reasonable address
+        if (ret == 0 || ret == -1) {
+            throw new RuntimeException("mmap() returned invalid address: 0x" + Long.toHexString(ret));
         }
         
         mmapBase = ret;
         mmapSize = mmapSizeCalc;
         
-        Status.println("mmap() allocated at: 0x" + Long.toHexString(mmapBase));
+        Status.println("mmap() allocated at: 0x" + Long.toHexString(mmapBase) + " (size: 0x" + Long.toHexString(mmapSize) + ")");
         
-        // Check if ELF by reading magic bytes
-        if (data.length >= 4) {
-            int magic = ((data[3] & 0xFF) << 24) | ((data[2] & 0xFF) << 16) | 
-                       ((data[1] & 0xFF) << 8) | (data[0] & 0xFF);
-            
-            if (magic == ELF_MAGIC) {
-                Status.println("Detected ELF payload, parsing headers...");
-                entryPoint = loadElfSegments(data);
+        try {
+            // Check if ELF by reading magic bytes
+            if (data.length >= 4) {
+                int magic = ((data[3] & 0xFF) << 24) | ((data[2] & 0xFF) << 16) | 
+                           ((data[1] & 0xFF) << 8) | (data[0] & 0xFF);
+                
+                if (magic == ELF_MAGIC) {
+                    Status.println("Detected ELF payload, parsing headers...");
+                    entryPoint = loadElfSegments(data);
+                } else {
+                    Status.println("Non-ELF payload, treating as raw shellcode");
+                    // Copy raw data to allocated memory with bounds checking
+                    if (data.length > mmapSize) {
+                        throw new RuntimeException("Payload size exceeds allocated memory");
+                    }
+                    api.memcpy(mmapBase, data, data.length);
+                    entryPoint = mmapBase;
+                }
             } else {
-                Status.println("Non-ELF payload, treating as raw shellcode");
-                // Copy raw data to allocated memory
-                api.memcpy(mmapBase, data, data.length);
-                entryPoint = mmapBase;
+                throw new RuntimeException("Payload too small (< 4 bytes)");
             }
-        } else {
-            throw new RuntimeException("Payload too small");
+            
+            // Validate entry point
+            if (entryPoint == 0) {
+                throw new RuntimeException("Invalid entry point: 0x0");
+            }
+            if (entryPoint < mmapBase || entryPoint >= mmapBase + mmapSize) {
+                throw new RuntimeException("Entry point outside allocated memory range: 0x" + Long.toHexString(entryPoint));
+            }
+            
+            Status.println("Entry point: 0x" + Long.toHexString(entryPoint));
+            
+        } catch (Exception e) {
+            // Cleanup on failure
+            Status.println("Cleaning up allocated memory due to error: " + e.getMessage());
+            long munmapResult = Helper.syscall(Helper.SYS_MUNMAP, mmapBase, mmapSize);
+            if (munmapResult < 0) {
+                Status.println("Warning: munmap() failed during cleanup: " + munmapResult);
+            }
+            mmapBase = 0;
+            mmapSize = 0;
+            entryPoint = 0;
+            throw e;
         }
-        
-        Status.println("Entry point: 0x" + Long.toHexString(entryPoint));
     }
     
     private static long loadElfSegments(byte[] data) throws Exception {
-        // Copy data to allocated memory first for easier parsing
-        api.memcpy(mmapBase, data, data.length);
-        
-        // Read ELF header
-        ElfHeader elfHeader = readElfHeader(mmapBase);
-        
-        // Load program segments
-        for (int i = 0; i < elfHeader.phNum; i++) {
-            long phdrAddr = mmapBase + elfHeader.phOff + (i * elfHeader.phEntSize);
-            ProgramHeader phdr = readProgramHeader(phdrAddr);
-            
-            if (phdr.type == PT_LOAD && phdr.memSize > 0) {
-                // Calculate segment address (use relative offset)
-                long segAddr = mmapBase + (phdr.vAddr % 0x1000000);
-                
-                // Copy segment data
-                if (phdr.fileSize > 0) {
-                    api.memcpy(segAddr, mmapBase + phdr.offset, phdr.fileSize);
-                }
-                
-                // Zero out remaining memory if memSize > fileSize
-                if (phdr.memSize > phdr.fileSize) {
-                    api.memset(segAddr + phdr.fileSize, 0, phdr.memSize - phdr.fileSize);
-                }
-            }
+        // Create temporary buffer for ELF parsing to avoid header corruption
+        long tempBuf = Helper.syscall(Helper.SYS_MMAP, 0L, (long)data.length,
+                                      (long)(PROT_READ | PROT_WRITE), (long)(MAP_PRIVATE | MAP_ANONYMOUS), -1L, 0L);
+        if (tempBuf < 0) {
+            throw new RuntimeException("Failed to allocate temp buffer for ELF parsing");
         }
         
-        // Return entry point (relative to base)
-        return mmapBase + (elfHeader.entry % 0x1000000);
+        try {
+            // Copy data to temp buffer for parsing
+            api.memcpy(tempBuf, data, data.length);
+            
+            // Read ELF header from temp buffer
+            ElfHeader elfHeader = readElfHeader(tempBuf);
+            
+            // Load program segments directly to final locations
+            for (int i = 0; i < elfHeader.phNum; i++) {
+                long phdrAddr = tempBuf + elfHeader.phOff + (i * elfHeader.phEntSize);
+                ProgramHeader phdr = readProgramHeader(phdrAddr);
+                
+                if (phdr.type == PT_LOAD && phdr.memSize > 0) {
+                    // Calculate segment address (use relative offset)
+                    long segAddr = mmapBase + (phdr.vAddr % 0x1000000);
+                    
+                    // Copy segment data from original data array
+                    if (phdr.fileSize > 0) {
+                        byte[] segmentData = new byte[(int)phdr.fileSize];
+                        System.arraycopy(data, (int)phdr.offset, segmentData, 0, (int)phdr.fileSize);
+                        api.memcpy(segAddr, segmentData, segmentData.length);
+                    }
+                    
+                    // Zero out BSS section
+                    if (phdr.memSize > phdr.fileSize) {
+                        api.memset(segAddr + phdr.fileSize, 0, phdr.memSize - phdr.fileSize);
+                    }
+                }
+            }
+            
+            return mmapBase + (elfHeader.entry % 0x1000000);
+            
+        } finally {
+            // Clean up temp buffer
+            Helper.syscall(Helper.SYS_MUNMAP, tempBuf, (long)data.length);
+        }
     }
     
     public static void run() throws Exception {
-        Status.println("Spawning payload in new thread...");
-        
         // Create Java thread to execute the payload
         payloadThread = new Thread(new Runnable() {
             public void run() {
@@ -292,13 +260,12 @@ public class BinLoader {
             }
         });
         
-        payloadThread.setName("PayloadThread");
+        payloadThread.setName("BinPayload");
         payloadThread.start();
         
         Status.println("Payload thread started successfully");
     }
     
-
     public static void waitForPayloadToExit() throws Exception {
         if (payloadThread != null) {
             Status.println("Waiting for payload thread to complete...");
@@ -307,20 +274,41 @@ public class BinLoader {
                 Status.println("Payload thread completed");
             } catch (InterruptedException e) {
                 Status.println("Thread wait interrupted: " + e.getMessage());
+                Thread.currentThread().interrupt(); // Restore interrupt status
             }
         }
         
-        // Cleanup allocated memory
-        Status.println("Cleaning up payload memory...");
-        long ret = Helper.syscall(Helper.SYS_MUNMAP, mmapBase, mmapSize);
-        if (ret < 0) {
-            Status.println("Warning: munmap() failed: " + ret);
+        // Cleanup allocated memory with validation
+        if (mmapBase != 0 && mmapSize > 0) {
+            Status.println("Cleaning up payload memory at 0x" + Long.toHexString(mmapBase) + " (size: 0x" + Long.toHexString(mmapSize) + ")");
+            
+            try {
+                long ret = Helper.syscall(Helper.SYS_MUNMAP, mmapBase, mmapSize);
+                if (ret < 0) {
+                    int errno = api.errno();
+                    Status.println("Warning: munmap() failed: " + ret + " (errno: " + errno + ")");
+                } else {
+                    Status.println("Successfully unmapped memory");
+                }
+            } catch (Exception e) {
+                Status.println("Exception during munmap(): " + e.getMessage());
+            }
+            
+            // Clear variables to prevent reuse
+            mmapBase = 0;
+            mmapSize = 0;
+            entryPoint = 0;
+            binData = null;
+        } else {
+            Status.println("No memory to cleanup (mmapBase=0x" + Long.toHexString(mmapBase) + ", mmapSize=" + mmapSize + ")");
         }
+        
+        // Clear thread reference
+        payloadThread = null;
         
         Status.println("Payload execution completed and cleaned up");
     }
     
-
     private static class ElfHeader {
         long entry;
         long phOff;
@@ -336,7 +324,6 @@ public class BinLoader {
         long memSize;
     }
     
-
     private static ElfHeader readElfHeader(long addr) {
         ElfHeader header = new ElfHeader();
         header.entry = api.read64(addr + 0x18);
@@ -346,7 +333,6 @@ public class BinLoader {
         return header;
     }
     
-
     private static ProgramHeader readProgramHeader(long addr) {
         ProgramHeader phdr = new ProgramHeader();
         phdr.type = api.read32(addr + 0x00);
@@ -358,144 +344,30 @@ public class BinLoader {
     }
     
     private static long roundUp(long value, long boundary) {
+        if (value < 0 || boundary <= 0) {
+            throw new IllegalArgumentException("Invalid arguments: value=" + value + ", boundary=" + boundary);
+        }
+        
+        // Check for potential overflow
+        if (value > Long.MAX_VALUE - boundary) {
+            throw new ArithmeticException("Integer overflow in roundUp calculation");
+        }
+        
         return ((value + boundary - 1) / boundary) * boundary;
     }
     
-    private static byte[] readFile(String filePath) throws Exception {
-        Text pathText = new Text(filePath);
-        
-        // Open file for reading
-        long fd = Helper.syscall(Helper.SYS_OPEN, pathText.address(), (long)O_RDONLY, 0L);
-        if (fd < 0) {
-            int errno = api.errno();
-            String errorMsg = "Failed to open file: " + filePath + " (fd: " + fd + ", errno: " + errno + ")";
-            
-            if (errno == ENOENT) {
-                errorMsg += " - File not found";
-            } else if (errno == EACCES) {
-                errorMsg += " - Permission denied";
-            } else if (errno == EISDIR) {
-                errorMsg += " - Is a directory";
-            }
-            
-            throw new RuntimeException(errorMsg);
-        }
-        
-        try {
-            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-            Buffer readBuffer = new Buffer(READ_CHUNK_SIZE);
-            int totalBytesRead = 0;
-            
-            while (true) {
-                long bytesRead = Helper.syscall(Helper.SYS_READ, fd, readBuffer.address(), (long)READ_CHUNK_SIZE);
-                
-                if (bytesRead < 0) {
-                    int errno = api.errno();
-                    throw new RuntimeException("Read error on file: " + filePath + " (errno: " + errno + ")");
-                }
-                
-                if (bytesRead == 0) {
-                    // EOF reached
-                    break;
-                }
-                
-                if (totalBytesRead + bytesRead > MAX_PAYLOAD_SIZE) {
-                    throw new RuntimeException("Payload too large: " + (totalBytesRead + bytesRead) + " bytes (max: " + MAX_PAYLOAD_SIZE + ")");
-                }
-                
-                byte[] chunk = new byte[(int)bytesRead];
-                for (int i = 0; i < bytesRead; i++) {
-                    chunk[i] = readBuffer.getByte(i);
-                }
-                
-                outputStream.write(chunk);
-                totalBytesRead += bytesRead;
-                
-                if (bytesRead < READ_CHUNK_SIZE) {
-                    break;
-                }
-            }
-            
-            if (totalBytesRead == 0) {
-                throw new RuntimeException("File is empty or could not be read: " + filePath);
-            }
-            
-            Status.println("Successfully read " + totalBytesRead + " bytes from: " + filePath);
-            return outputStream.toByteArray();
-            
-        } finally {
-            long closeResult = Helper.syscall(Helper.SYS_CLOSE, fd);
-            if (closeResult < 0) {
-                int errno = api.errno();
-                Status.println("Warning: Failed to close file descriptor " + fd + " (error: " + closeResult + ", errno: " + errno + ")");
-            }
-        }
-    }
-        
-
-    public static boolean fileExists(String filePath) {
-        try {
-            Text pathText = new Text(filePath);
-            
-            // Try to open the file for reading
-            long fd = Helper.syscall(Helper.SYS_OPEN, pathText.address(), (long)O_RDONLY, 0L);
-            
-            if (fd >= 0) {
-                // File exists and was opened successfully, close it
-                Helper.syscall(Helper.SYS_CLOSE, fd);
-                return true;
-            } else {
-                int errno = api.errno();
-                if (errno == ENOENT) {
-                    // File doesn't exist
-                    return false;
-                } else if (errno == EACCES) {
-                    // File exists but permission denied - still counts as existing
-                    Status.println("Warning: File exists but access denied: " + filePath);
-                    return true;
-                } else if (errno == EISDIR) {
-                    // Path is a directory, not a file
-                    Status.println("Warning: Path is a directory: " + filePath);
-                    return false;
-                }
-                return false;
-            }
-            
-        } catch (Exception e) {
-            Status.println("Error checking file existence: " + e.getMessage());
-            return false;
-        }
-    }
-
-    public static void executePayloadFromPath(String payloadDataPath) {
-        try {
-            if (fileExists(payloadDataPath)) {
-                Status.println("Loading payload from: " + payloadDataPath);
-                
-                loadFromFile(payloadDataPath);
-                run();
-                waitForPayloadToExit();
-                
-                Status.println("Payload execution completed successfully");
-            } else {
-                Status.println("Payload file not found: " + payloadDataPath);
-            }
-        } catch (Exception e) {
-            Status.println("Error: " + e.getMessage());
-            e.printStackTrace();
-        }
-    }
-    
-    public static void listenForPayloadOnPort(int port) {
+    public static void listenForPayloadsOnPort(int port) {
         ServerSocket serverSocket = null;
-        Socket clientSocket = null;
         
         try {
             serverSocket = new ServerSocket(port);
-            Status.println("BinLoader listening on port " + port + "...");
-            NativeInvoke.sendNotificationRequest("BinLoader listening on port " + port + "...");
+            Status.println("BinLoader listening on port " + port);
+            NativeInvoke.sendNotificationRequest("BinLoader listening on port " + port);
             
+            // Keep listening for connections indefinitely
             while (true) {
+                Socket clientSocket = null;
+                
                 try {
                     clientSocket = serverSocket.accept();
                     Status.println("Accepted new connection from: " + clientSocket.getInetAddress());
@@ -512,30 +384,18 @@ public class BinLoader {
                     waitForPayloadToExit();
                     
                     Status.println("Payload execution completed successfully");
-                    
-                    // Close client socket
-                    if (clientSocket != null) {
-                        try {
-                            clientSocket.close();
-                            clientSocket = null;
-                        } catch (IOException e) {
-                            Status.println("Error closing client socket: " + e.getMessage());
-                        }
-                    }
-                    
-                    Status.println("Ready for next payload...");
+                    Status.println("BinLoader listening on port " + port);
                     
                 } catch (Exception e) {
                     Status.println("Error processing payload: " + e.getMessage());
                     e.printStackTrace();
-                    
-                    // Close client socket on error
+                } finally {
+                    // Close client socket
                     if (clientSocket != null) {
                         try {
                             clientSocket.close();
-                            clientSocket = null;
-                        } catch (IOException e2) {
-                            Status.println("Error closing client socket: " + e2.getMessage());
+                        } catch (IOException e) {
+                            Status.println("Error closing client socket: " + e.getMessage());
                         }
                     }
                 }
@@ -545,15 +405,6 @@ public class BinLoader {
             Status.println("Network server error: " + e.getMessage());
             e.printStackTrace();
         } finally {
-            // Close client socket
-            if (clientSocket != null) {
-                try {
-                    clientSocket.close();
-                } catch (IOException e) {
-                    Status.println("Error closing client socket: " + e.getMessage());
-                }
-            }
-            
             // Close server socket
             if (serverSocket != null) {
                 try {
@@ -590,16 +441,5 @@ public class BinLoader {
         
         return payloadData;
     }
-    
-    public static boolean isRunning() {
-        return isRunning;
-    }
-    
-    public static void stop() {
-        if (binLoaderThread != null && binLoaderThread.isAlive()) {
-            Status.println("Stopping BinLoader thread...");
-            binLoaderThread.interrupt();
-            isRunning = false;
-        }
-    }
+
 }

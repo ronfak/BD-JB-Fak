@@ -57,9 +57,7 @@ public class InitXlet implements Xlet {
         
         // Add sanity check
         if (System.getSecurityManager() == null) {
-            
-            FileProxyDisabler.disableFileProxies();
-            
+                        
             boolean UseInternalJar = false;
 
             if (!UseInternalJar) {

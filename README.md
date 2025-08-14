@@ -8,6 +8,7 @@ Just take my early Christmas gift :)
 No this won't work at PS5.  
 
 Here’s your updated guide with **shahrilnet** and **null\_ptr** added to the end of the credits:
+Here’s your **updated guide** with the extra note about sending `Lapse.jar` when using `RemoteJarLoader-1.1.iso` added in the relevant spots.
 
 ---
 
@@ -15,6 +16,14 @@ Here’s your updated guide with **shahrilnet** and **null\_ptr** added to the e
 
 ### Preparation
 
+* **Release Contents**:
+
+  * **`Lapse.iso`** — Contains the Lapse JAR payload built in.
+
+    * This JAR will automatically load the binary payload from `/mnt/usb0/payload.bin` and copy it to `/data/payload.bin`.
+  * **`RemoteJarLoader-1.1.iso`** — Allows you to send your **own** JAR payload using RemoteJarLoader (see section below).
+
+    * If you want to send the **Lapse JAR payload** while using `RemoteJarLoader-1.1.iso`, you can send `Lapse.jar` instead of building your own.
 * **USB Requirements**:
 
   * Format your USB drive as **exFAT** or **FAT32**.
@@ -32,12 +41,16 @@ Here’s your updated guide with **shahrilnet** and **null\_ptr** added to the e
 
 ### Payload Workflow
 
-* The Lapse JAR payload will:
+* When using **`Lapse.iso`**:
 
-  * Detect `/mnt/usb0/payload.bin` and copy it to `/data/payload.bin`.
-  * If `payload.bin` is missing, it launches a **binLoader server** on **port 9020**.
+  * Automatically loads `/mnt/usb0/payload.bin` → copies to `/data/payload.bin`.
+  * If `payload.bin` is missing, launches a **binLoader server** on **port 9020**.
 
-    * Use `payload_sender.py` (or any TCP payload sender — see **RemoteJarLoader** section below) to send the binary payload.
+    * Use `payload_sender.py` (or any TCP payload sender — see **RemoteJarLoader** section) to send the binary payload.
+* When using **`RemoteJarLoader-1.1.iso`**:
+
+  * Allows sending your own JAR payload to port **9025** (see section below).
+  * If you want the same behavior as `Lapse.iso`, simply send `Lapse.jar` as the payload.
 
 ### Logging
 
@@ -67,6 +80,7 @@ Here’s your updated guide with **shahrilnet** and **null\_ptr** added to the e
 * Use `payload_sender.py` to send the JAR file.
 * Alternatively, any TCP payload sender may be used.
 * Ensure the **`Main-Class`** is correctly set in `manifest.txt`.
+* To send the Lapse JAR payload with `RemoteJarLoader-1.1.iso`, use `Lapse.jar`.
 
 ---
 
@@ -76,7 +90,7 @@ This exploit requires burning a Blu-ray ISO file onto a disc. Recommended tools:
 
 * **Windows**: Use **ImgBurn** — a lightweight and reliable disc-burning application.
 
-  * Official site: [ImgBurn Download](https://www.imgburn.com)
+  * Official site: [ImgBurn Download](https://www.imgburn.com/)
 
 * **Linux**: Use **K3b** — KDE’s disc-burning application with full Blu-ray support.
 
@@ -86,13 +100,19 @@ This exploit requires burning a Blu-ray ISO file onto a disc. Recommended tools:
 
 ## Summary: Execution Checklist
 
-1. Format USB as **exFAT/FAT32** → Rename and place `payload.bin` (renamed from `goldhen.bin`) in root.
-2. Insert USB **first**, then Blu-ray disc.
-3. Ensure **HDCP enabled** in PS4 settings.
-4. If Blu-ray playback is not yet activated, allow one-time internet connection — **then disable auto-updates**.
-5. Burn the Blu-ray ISO using ImgBurn (Windows) or K3b (Linux).
-6. Launch Lapse payload: auto-load payload from USB or start binLoader server (port 9020).
-7. Use RemoteJarLoader (port 9025) if needed.
+1. Choose ISO:
+
+   * `Lapse.iso` → Uses built-in Lapse JAR payload.
+   * `RemoteJarLoader-1.1.iso` → Send your own JAR payload (or `Lapse.jar` for default behavior).
+2. Format USB as **exFAT/FAT32** → Rename and place `payload.bin` (renamed from `goldhen.bin`) in root.
+3. Insert USB **first**, then Blu-ray disc.
+4. Ensure **HDCP enabled** in PS4 settings.
+5. If Blu-ray playback is not yet activated, allow one-time internet connection — **then disable auto-updates**.
+6. Burn the chosen ISO using ImgBurn (Windows) or K3b (Linux).
+7. Launch payload:
+
+   * From USB (Lapse.iso) or binLoader server (port 9020).
+   * Send JAR via RemoteJarLoader (port 9025) if using RemoteJarLoader ISO.
 8. Capture logs via RemoteLogger (port 18194).
 9. If failure occurs, **reboot PS4 — do not simply reopen BD-J app**.
 
@@ -110,9 +130,10 @@ Don’t forget to replace the **BDJO** file in `BDMV`.
 * **[TheFlow](https://github.com/theofficialflow)** — For BD-JB documentation and native code execution sources.
 * **[hammer-83](https://github.com/hammer-83)** — For the PS5 Remote JAR Loader, which helped me understand BD-J internals.
 * **[john-tornblom](https://github.com/john-tornblom)** — For BDJ-SDK, without which I couldn’t have compiled PS4 BD-J.
-* **[shahrilnet, null_ptr](https://github.com/shahrilnet/remote_lua_loader)** — For Lua Lapse implementation, without which BD-J implementation was impossible.
+* **[shahrilnet, null\_ptr](https://github.com/shahrilnet/remote_lua_loader)** — For Lua Lapse implementation, without which BD-J implementation was impossible.
 
 ---
+
 
 
 

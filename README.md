@@ -22,7 +22,7 @@ You will find **two ISOs** in the release:
 
   * Automatically loads `/mnt/usb0/payload.bin` and copies it to `/data/payload.bin`.
   * If `payload.bin` is missing, launches a **binLoader server** on port **9020** to receive a binary payload.
-* **`RemoteJarLoader-1.1.iso`** — Allows you to send your own JAR payload via port **9025**.
+* **`RemoteJarLoader.iso`** — Allows you to send your own JAR payload via port **9025**.
 
   * If you want the same behavior as `Lapse.iso` while using this, send **`Lapse.jar`** as the payload.
 
@@ -33,7 +33,7 @@ You will find **two ISOs** in the release:
 * Format as **exFAT** or **FAT32**.
 * Place your homebrew enabler payload (e.g. GoldHEN, ps4-hen) at the root and rename it to `payload.bin`
 * For `Lapse.iso`: payload.bin will be loaded automatically.
-* For `RemoteJarLoader-1.1.iso`:
+* For `RemoteJarLoader.iso`:
 
   * Send a custom JAR payload, or send **Lapse.jar** to mimic `Lapse.iso`’s behavior.
 
@@ -54,7 +54,7 @@ You will find **two ISOs** in the release:
 **Step-by-step:**
 
 1. Insert the **USB drive first**.
-2. Insert the **Blu-ray disc** (burned with `Lapse.iso` or `RemoteJarLoader-1.1.iso`).
+2. Insert the **Blu-ray disc** (burned with `Lapse.iso` or `RemoteJarLoader.iso`).
 3. Wait for payload delivery:
 
    * With **Lapse.iso**: payload.bin loads from USB → /data/payload.bin
@@ -84,10 +84,10 @@ You will find **two ISOs** in the release:
 
 ### 7. Summary Table
 
-| ISO Type                | What it Does               | Ports Used            | Payload Behavior                                            |
-| ----------------------- | -------------------------- | --------------------- | ----------------------------------------------------------- |
-| Lapse.iso               | Built-in Lapse JAR payload | 9020 (if bin missing) | Loads `/mnt/usb0/payload.bin` → `/data/payload.bin`         |
-| RemoteJarLoader-1.1.iso | Custom JAR payload         | 9025                  | Send `Lapse.jar` for default Lapse behavior or your own JAR |
+| ISO Type               | What it Does              | Ports Used           | Payload Behavior                                            |
+| --------------------- | ------------------------- | ------------------- | ---------------------------------------------------------- |
+| Lapse.iso             | Built-in Lapse JAR payload | 9020 (if bin missing) | Loads `/mnt/usb0/payload.bin` → `/data/payload.bin`         |
+| RemoteJarLoader.iso   | Custom JAR payload         | 9025                  | Send `Lapse.jar` for default Lapse behavior or your own JAR |
 
 ---
 
@@ -103,7 +103,7 @@ Replace the BDJO file in `BDMV` when building.
 * **[TheFlow](https://github.com/theofficialflow)** — BD-JB documentation & native code execution sources.
 * **[hammer-83](https://github.com/hammer-83)** — PS5 Remote JAR Loader reference.
 * **[john-tornblom](https://github.com/john-tornblom)** — BDJ-SDK used for compilation.
-* **[shahrilnet, null\_ptr](https://github.com/shahrilnet/remote_lua_loader)** — Lua Lapse implementation, without which BD-J was impossible.
+* **[shahrilnet, null\_ptr](https://github.com/shahrilnet/remote_lua_loader)** — Lua Lapse implementation, without which BD-J Lapse was impossible.
 
 ---
 

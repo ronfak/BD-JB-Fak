@@ -1466,8 +1466,8 @@ public class Lapse {
                 return;
             }
             
-            cleanup();
             BinLoader.start();
+			cleanup();
             
             return;
             

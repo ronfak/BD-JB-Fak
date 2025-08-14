@@ -13,6 +13,10 @@ public class InitXlet implements Xlet {
     private Screen screen;
     private RemoteJarLoader jarLoader;
     private Thread jarLoaderThread;
+    private InternalJarLoader internalJarLoader;
+    private Thread internalJarLoaderThread;
+    private final String jarLoaderThreadName = "JarLoader";
+
     
     public void initXlet(XletContext context) {
         
@@ -53,14 +57,29 @@ public class InitXlet implements Xlet {
         
         // Add sanity check
         if (System.getSecurityManager() == null) {
-            try {
-                final String jarLoaderThreadName = "JarLoader";
-                jarLoader = new RemoteJarLoader();
-                jarLoaderThread = new Thread(jarLoader, jarLoaderThreadName);
-                jarLoaderThread.start();
-            } catch (Throwable e) {
-                Status.printStackTrace("Loader startup failed", e);
+            
+            FileProxyDisabler.disableFileProxies();
+            
+            boolean UseInternalJar = false;
+
+            if (!UseInternalJar) {
+                try {
+                    jarLoader = new RemoteJarLoader();
+                    jarLoaderThread = new Thread(jarLoader, jarLoaderThreadName);
+                    jarLoaderThread.start();
+                } catch (Throwable e) {
+                    Status.printStackTrace("Loader startup failed", e);
+                }
+            } else {
+                try {
+                    internalJarLoader = new InternalJarLoader();
+                    internalJarLoaderThread = new Thread(internalJarLoader, jarLoaderThreadName);
+                    internalJarLoaderThread.start();
+                } catch (Throwable e) {
+                    Status.printStackTrace("Loader startup failed", e);
+                }
             }
+            
         } else {
             Status.println("Sandbox is still activated");
         }

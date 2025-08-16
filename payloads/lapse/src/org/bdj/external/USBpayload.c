@@ -40,15 +40,15 @@ int sceKernelSendNotificationRequest(int, notify_request_t*, size_t, int);
 #define PT_LOAD 1
 
 static const char* USB_PAYLOAD_PATHS[] = {
-    "/mnt/usb0/payload.bin",
-    "/mnt/usb1/payload.bin", 
-    "/mnt/usb2/payload.bin",
-    "/mnt/usb3/payload.bin",
-    "/mnt/usb4/payload.bin"
+    "/mnt/usb0/goldhen.bin",
+    "/mnt/usb1/goldhen.bin", 
+    "/mnt/usb2/goldhen.bin",
+    "/mnt/usb3/goldhen.bin",
+    "/mnt/usb4/goldhen.bin"
 };
 #define USB_PATHS_COUNT (sizeof(USB_PAYLOAD_PATHS) / sizeof(USB_PAYLOAD_PATHS[0]))
 
-static const char* DATA_PAYLOAD_PATH = "/data/payload.bin";
+static const char* DATA_PAYLOAD_PATH = "/data/GoldHEN/payloads/goldhen.bin";
 
 typedef struct {
     uint64_t e_entry;

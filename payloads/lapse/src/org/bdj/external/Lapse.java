@@ -1402,6 +1402,7 @@ public class Lapse {
                     
             if (Helper.isJailbroken()) {
                 Status.println("Already Jailbroken");
+                NativeInvoke.sendNotificationRequest("Already Jailbroken");
                 return;
             }
             

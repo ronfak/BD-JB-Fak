@@ -103,7 +103,7 @@ public class BinLoader {
             outputStream.close();
         }
     }
-	
+    
     public static void loadFromData(byte[] data) throws Exception {
         if (data == null) {
             throw new IllegalArgumentException("Payload data cannot be null");
@@ -362,7 +362,9 @@ public class BinLoader {
         try {
             serverSocket = new ServerSocket(port);
             Status.println("BinLoader listening on port " + port);
-            NativeInvoke.sendNotificationRequest("BinLoader listening on port " + port);
+            
+            //Remove notification because it confuses user
+            //NativeInvoke.sendNotificationRequest("BinLoader listening on port " + port);
             
             // Keep listening for connections indefinitely
             while (true) {

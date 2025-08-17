@@ -88,6 +88,8 @@ public class Helper {
     public static final int SYS_JITSHM_CREATE = 0x215;
     public static final int SYS_JITSHM_ALIAS = 0x216;
     public static final int SYS_KEXEC = 0x295;
+    
+    public static final int SYS_SETUID = 0x17;
 
     private static API api;
     private static long libkernelBase;
@@ -124,7 +126,8 @@ public class Helper {
             SYS_EVF_CREATE, SYS_EVF_DELETE, SYS_EVF_SET, SYS_EVF_CLEAR,
             SYS_GETPID, SYS_GETUID, SYS_SYSCTL, SYS_IS_IN_SANDBOX,
             SYS_CPUSET_GETAFFINITY, SYS_CPUSET_SETAFFINITY, SYS_RTPRIO_THREAD,
-            SYS_MUNMAP, SYS_MMAP, SYS_JITSHM_CREATE, SYS_JITSHM_ALIAS, SYS_KEXEC
+            SYS_MUNMAP, SYS_MMAP, SYS_JITSHM_CREATE, SYS_JITSHM_ALIAS, SYS_KEXEC,
+            SYS_SETUID
         };
 
         boolean allFound = true;
@@ -198,9 +201,12 @@ public class Helper {
 
     public static boolean isJailbroken() {
         try {
-            long uid = syscall(SYS_GETUID);
-            long inSandbox = syscall(SYS_IS_IN_SANDBOX);
-            return uid == 0 && inSandbox == 0;
+            long setuidResult = syscall(SYS_SETUID, 0L);
+            if (setuidResult == 0) {
+                return true;
+            } else {
+                return false;
+            }
         } catch (Exception e) {
             return false;
         }

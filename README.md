@@ -18,11 +18,11 @@ No this won't work at PS5.
 
 You will find **two ISOs** in the release:
 
-* **`Lapse.iso`** — Contains the Lapse JAR payload built in.
+* **`Lapse.iso`** (or equivalent, like Lapse-1.1b.iso) — Contains the Lapse JAR payload built in.
 
   * Automatically loads `payload.bin` in USB and copies it to `/data/payload.bin`.
   * If `payload.bin` is missing, launches a **binLoader server** on port **9020** to receive a binary payload.
-* **`RemoteJarLoader.iso`** — Allows you to send your own JAR payload via port **9025**.
+* **`RemoteJarLoader.iso`** (or equivalent, like RemoteJarLoader-1.2.iso) — Allows you to send your own JAR payload via port **9025**.
 
   * If you want the same behavior as `Lapse.iso` while using this, send **`Lapse.jar`** as the payload.
 
@@ -77,8 +77,8 @@ You will find **two ISOs** in the release:
 
 ### 6. Burning the Blu-ray ISO
 
-* **Windows**: Use **[ImgBurn](https://www.imgburn.com/?utm_source=chatgpt.com)**.
-* **Linux**: Use **[K3b](https://apps.kde.org/k3b/?utm_source=chatgpt.com)**.
+* **Windows**: Use **[ImgBurn](https://www.imgburn.com/)**.
+* **Linux**: Use **[K3b](https://apps.kde.org/k3b/)**.
 
 ---
 

@@ -77,8 +77,8 @@ You will find **two ISOs** in the release:
 
 ### 6. Burning the Blu-ray ISO
 
-* **Windows**: Use **[ImgBurn](https://www.imgburn.com/?utm_source=chatgpt.com)**.
-* **Linux**: Use **[K3b](https://apps.kde.org/k3b/?utm_source=chatgpt.com)**.
+* **Windows**: Use **[ImgBurn](https://www.imgburn.com)**.
+* **Linux**: Use **[K3b](https://apps.kde.org/k3b)**.
 
 ---
 
@@ -106,6 +106,7 @@ Replace the BDJO file in `BDMV` when building.
 * **[shahrilnet, null\_ptr](https://github.com/shahrilnet/remote_lua_loader)** — Lua Lapse implementation, without which BD-J Lapse was impossible.
 
 ---
+
 
 
 

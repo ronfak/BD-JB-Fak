@@ -58,7 +58,7 @@ public class InitXlet implements Xlet {
         // Add sanity check
         if (System.getSecurityManager() == null) {
                         
-            boolean UseInternalJar = false;
+            boolean UseInternalJar = true; // was false
 
             if (!UseInternalJar) {
                 try {

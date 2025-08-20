@@ -21,7 +21,7 @@ You will find **two ISOs** in the release:
 * **`Lapse.iso`** — Contains the Lapse JAR payload built in.
 
   * Automatically loads `payload.bin` in USB and copies it to `/data/payload.bin`.
-  * If `payload.bin` is missing, launches a **binLoader server** on port **9020** to receive a binary payload.
+  * BinLoader always listens to 9020 regardless of whether `payload.bin` is found or not.
 * **`RemoteJarLoader.iso`** — Allows you to send your own JAR payload via port **9025**.
 
   * If you want the same behavior as `Lapse.iso` while using this, send **`Lapse.jar`** as the payload.
@@ -106,6 +106,7 @@ Replace the BDJO file in `BDMV` when building.
 * **[shahrilnet, null\_ptr](https://github.com/shahrilnet/remote_lua_loader)** — Lua Lapse implementation, without which BD-J Lapse was impossible.
 
 ---
+
 
 
 
